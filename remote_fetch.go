@@ -17,7 +17,7 @@ type RemoteFetchStrategy func() error
 
 var (
 	supportedOS   = []string{"linux", "darwin"}
-	supportedArch = []string{"amd64"}
+	supportedArch = []string{"amd64", "arm64"}
 )
 
 func isSupported(value string, supported ...string) bool {
