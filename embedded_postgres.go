@@ -82,7 +82,7 @@ func (ep *EmbeddedPostgres) Start() error {
 	}
 
 	var logger PostgresLogger
-	if _, err := os.Stat(os.TempDir()); err != nil {
+	if _, err := os.Stat(os.TempDir()); err == nil {
 		logger, err = newSyncedLogger("", ep.config.logger)
 		if err != nil {
 			return fmt.Errorf("unable to create logger:%w", err)
