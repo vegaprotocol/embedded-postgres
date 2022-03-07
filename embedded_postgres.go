@@ -178,7 +178,7 @@ func (ep *EmbeddedPostgres) cleanDataDirectoryAndInit() error {
 		return fmt.Errorf("unable to clean up data directory %s with error: %w", ep.config.dataPath, err)
 	}
 
-	if err := ep.initDatabase(ep.config.binariesPath, ep.config.runtimePath, ep.config.dataPath, ep.config.username, ep.config.password, ep.config.locale, ep.logger.file); err != nil {
+	if err := ep.initDatabase(ep.config.binariesPath, ep.config.runtimePath, ep.config.dataPath, ep.config.username, ep.config.password, ep.config.locale, ep.logger); err != nil {
 		return err
 	}
 
@@ -216,8 +216,8 @@ func startPostgres(ep *EmbeddedPostgres) error {
 	ep.postgresProcess = exec.Command(postgresBinary,
 		"-D", ep.config.dataPath,
 		"-p", fmt.Sprintf("%d", ep.config.port))
-	ep.postgresProcess.Stdout = ep.logger.file
-	ep.postgresProcess.Stderr = ep.logger.file
+	ep.postgresProcess.Stdout = ep.logger.stdOut()
+	ep.postgresProcess.Stderr = ep.logger.stdErr()
 
 	var postgresStartErr error
 
