@@ -41,11 +41,11 @@ func defaultInitDatabase(binaryExtractLocation, runtimePath, pgDataDir, username
 	postgresInitDBProcess.Stdout = logger.stdOut()
 
 	if err := postgresInitDBProcess.Run(); err != nil {
-		return fmt.Errorf("unable to init database using: %s", postgresInitDBProcess.String())
+		return fmt.Errorf("unable to init database using: %s: %w", postgresInitDBProcess.String(), err)
 	}
 
 	if err = os.Remove(passwordFile); err != nil {
-		return fmt.Errorf("unable to remove password file '%v'", passwordFile)
+		return fmt.Errorf("unable to remove password file '%v': %w", passwordFile, err)
 	}
 
 	if err = enableTimescaleDB(pgDataDir); err != nil {
