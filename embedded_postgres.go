@@ -74,6 +74,10 @@ func (ep *EmbeddedPostgres) Start() error {
 		return err
 	}
 
+	if _, err := os.Stat(os.TempDir()); err != nil {
+		return fmt.Errorf("temp directory %s does not exist:%w", os.TempDir(), err)
+	}
+
 	logger, err := newSyncedLogger("", ep.config.logger)
 	if err != nil {
 		return fmt.Errorf("unable to create logger:%w", err)
