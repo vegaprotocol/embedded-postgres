@@ -27,6 +27,14 @@ func newSyncedLogger(dir string, logger io.Writer) (*syncedLogger, error) {
 	return &s, nil
 }
 
+func (s *syncedLogger) stdOut() io.Writer {
+	return s.file
+}
+
+func (s *syncedLogger) stdErr() io.Writer {
+	return s.file
+}
+
 func (s *syncedLogger) flush() error {
 	if s.logger != nil {
 		file, err := os.Open(s.file.Name())
@@ -52,5 +60,24 @@ func (s *syncedLogger) flush() error {
 		s.offset += readBytes
 	}
 
+	return nil
+}
+
+type defaultLogger struct {
+}
+
+func newDefaultLogger() *defaultLogger {
+	return &defaultLogger{}
+}
+
+func (s *defaultLogger) stdOut() io.Writer {
+	return os.Stdout
+}
+
+func (s *defaultLogger) stdErr() io.Writer {
+	return os.Stderr
+}
+
+func (s *defaultLogger) flush() error {
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -25,9 +26,15 @@ type EmbeddedPostgres struct {
 	initDatabase        initDatabase
 	createDatabase      createDatabase
 	started             bool
-	syncedLogger        *syncedLogger
+	logger              PostgresLogger
 	postgresProcess     *exec.Cmd
 	cancelProcess       context.CancelFunc
+}
+
+type PostgresLogger interface {
+	flush() error
+	stdOut() io.Writer
+	stdErr() io.Writer
 }
 
 // NewDatabase creates a new EmbeddedPostgres struct that can be used to start and stop a Postgres process.
@@ -74,16 +81,16 @@ func (ep *EmbeddedPostgres) Start() error {
 		return err
 	}
 
+	var logger PostgresLogger
 	if _, err := os.Stat(os.TempDir()); err != nil {
-		return fmt.Errorf("temp directory %s does not exist:%w", os.TempDir(), err)
+		logger, err = newSyncedLogger("", ep.config.logger)
+		if err != nil {
+			return fmt.Errorf("unable to create logger:%w", err)
+		}
+	} else {
+		logger = newDefaultLogger()
 	}
-
-	logger, err := newSyncedLogger("", ep.config.logger)
-	if err != nil {
-		return fmt.Errorf("unable to create logger:%w", err)
-	}
-
-	ep.syncedLogger = logger
+	ep.logger = logger
 
 	cacheLocation, cacheExists := ep.cacheLocator()
 
@@ -132,7 +139,7 @@ func (ep *EmbeddedPostgres) Start() error {
 		return err
 	}
 
-	if err := ep.syncedLogger.flush(); err != nil {
+	if err := ep.logger.flush(); err != nil {
 		return err
 	}
 
@@ -171,7 +178,7 @@ func (ep *EmbeddedPostgres) cleanDataDirectoryAndInit() error {
 		return fmt.Errorf("unable to clean up data directory %s with error: %w", ep.config.dataPath, err)
 	}
 
-	if err := ep.initDatabase(ep.config.binariesPath, ep.config.runtimePath, ep.config.dataPath, ep.config.username, ep.config.password, ep.config.locale, ep.syncedLogger.file); err != nil {
+	if err := ep.initDatabase(ep.config.binariesPath, ep.config.runtimePath, ep.config.dataPath, ep.config.username, ep.config.password, ep.config.locale, ep.logger.file); err != nil {
 		return err
 	}
 
@@ -190,7 +197,7 @@ func (ep *EmbeddedPostgres) Stop() error {
 
 	ep.started = false
 
-	if err := ep.syncedLogger.flush(); err != nil {
+	if err := ep.logger.flush(); err != nil {
 		return err
 	}
 
@@ -209,8 +216,8 @@ func startPostgres(ep *EmbeddedPostgres) error {
 	ep.postgresProcess = exec.Command(postgresBinary,
 		"-D", ep.config.dataPath,
 		"-p", fmt.Sprintf("%d", ep.config.port))
-	ep.postgresProcess.Stdout = ep.syncedLogger.file
-	ep.postgresProcess.Stderr = ep.syncedLogger.file
+	ep.postgresProcess.Stdout = ep.logger.file
+	ep.postgresProcess.Stderr = ep.logger.file
 
 	var postgresStartErr error
 
