@@ -76,7 +76,7 @@ func (ep *EmbeddedPostgres) Start() error {
 
 	logger, err := newSyncedLogger("", ep.config.logger)
 	if err != nil {
-		return errors.New("unable to create logger")
+		return fmt.Errorf("unable to create logger:%w", err)
 	}
 
 	ep.syncedLogger = logger
@@ -92,7 +92,7 @@ func (ep *EmbeddedPostgres) Start() error {
 	}
 
 	if err := os.RemoveAll(ep.config.runtimePath); err != nil {
-		return fmt.Errorf("unable to clean up runtime directory %s with error: %s", ep.config.runtimePath, err)
+		return fmt.Errorf("unable to clean up runtime directory %s with error: %w", ep.config.runtimePath, err)
 	}
 
 	if ep.config.binariesPath == "" {
@@ -113,7 +113,7 @@ func (ep *EmbeddedPostgres) Start() error {
 	}
 
 	if err := os.MkdirAll(ep.config.runtimePath, 0755); err != nil {
-		return fmt.Errorf("unable to create runtime directory %s with error: %s", ep.config.runtimePath, err)
+		return fmt.Errorf("unable to create runtime directory %s with error: %w", ep.config.runtimePath, err)
 	}
 
 	reuseData := dataDirIsValid(ep.config.dataPath, ep.config.version)
@@ -144,7 +144,7 @@ func (ep *EmbeddedPostgres) Start() error {
 
 		if err := backoff.Retry(op, expBackoff); err != nil {
 			if stopErr := stopPostgres(ep); stopErr != nil {
-				return fmt.Errorf("unable to stop database casused by error %s", err)
+				return fmt.Errorf("unable to stop database casused by error %w", err)
 			}
 
 			return err
@@ -153,7 +153,7 @@ func (ep *EmbeddedPostgres) Start() error {
 
 	if err := healthCheckDatabaseOrTimeout(ep.config); err != nil {
 		if stopErr := stopPostgres(ep); stopErr != nil {
-			return fmt.Errorf("unable to stop database casused by error %s", err)
+			return fmt.Errorf("unable to stop database casused by error %w", err)
 		}
 
 		return err
@@ -164,7 +164,7 @@ func (ep *EmbeddedPostgres) Start() error {
 
 func (ep *EmbeddedPostgres) cleanDataDirectoryAndInit() error {
 	if err := os.RemoveAll(ep.config.dataPath); err != nil {
-		return fmt.Errorf("unable to clean up data directory %s with error: %s", ep.config.dataPath, err)
+		return fmt.Errorf("unable to clean up data directory %s with error: %w", ep.config.dataPath, err)
 	}
 
 	if err := ep.initDatabase(ep.config.binariesPath, ep.config.runtimePath, ep.config.dataPath, ep.config.username, ep.config.password, ep.config.locale, ep.syncedLogger.file); err != nil {
