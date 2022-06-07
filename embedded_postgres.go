@@ -268,16 +268,17 @@ func stopPostgres(ep *EmbeddedPostgres) error {
 }
 
 func ensurePortAvailable(port uint32) error {
-	conn, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort("localhost", fmt.Sprintf("%d", port)), 100*time.Millisecond)
+	defer func() {
+		if conn != nil {
+			conn.Close()
+		}
+	}()
 	if err != nil {
-		return fmt.Errorf("process already listening on port %d", port)
+		// If we couldn't connect, that's great - probably nothing is listening there
+		return nil
 	}
-
-	if err := conn.Close(); err != nil {
-		return err
-	}
-
-	return nil
+	return fmt.Errorf("Something listening on port %v", port)
 }
 
 func dataDirIsValid(dataDir string, version PostgresVersion) bool {
