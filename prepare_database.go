@@ -151,7 +151,7 @@ func defaultCreateDatabase(port uint32, username, password, database string) err
 		return errorCustomDatabase(database, err)
 	}
 
-	if _, err := sql.OpenDB(conn).Exec(fmt.Sprintf("CREATE DATABASE %s", database)); err != nil {
+	if _, err := sql.OpenDB(conn).Exec(fmt.Sprintf("CREATE DATABASE %s TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C'")); err != nil {
 		return errorCustomDatabase(database, err)
 	}
 
