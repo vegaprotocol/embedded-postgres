@@ -16,6 +16,8 @@ type Config struct {
 	runtimePath  string
 	dataPath     string
 	binariesPath string
+	socketDir    string
+	listenAddr   string
 	locale       string
 	startTimeout time.Duration
 	logger       io.Writer
@@ -36,6 +38,8 @@ func DefaultConfig() Config {
 		database:     "postgres",
 		username:     "postgres",
 		password:     "postgres",
+		listenAddr:   "localhost",
+		socketDir:    "/tmp",
 		startTimeout: 15 * time.Second,
 		logger:       os.Stdout,
 	}
@@ -62,6 +66,19 @@ func (c Config) Database(database string) Config {
 // Username sets the username that will be used to connect.
 func (c Config) Username(username string) Config {
 	c.username = username
+	return c
+}
+
+// Directory for creating unix socket files (defaults to /tmp)
+func (c Config) SocketDir(socketDir string) Config {
+	c.socketDir = socketDir
+	return c
+}
+
+// ListenAddr sets the addresses that postgres will listen on, default is "localhost" an empty
+// string disables listening on IP addresses completely; only UNIX socket connections are allowed.
+func (c Config) ListenAddr(addr string) Config {
+	c.listenAddr = addr
 	return c
 }
 
