@@ -71,14 +71,17 @@ func newDatabaseWithConfig(config Config) *EmbeddedPostgres {
 
 // Start will try to start the configured Postgres process returning an error when there were any problems with invocation.
 // If any error occurs Start will try to also Stop the Postgres process in order to not leave any sub-process running.
+//
 //nolint:funlen
 func (ep *EmbeddedPostgres) Start() error {
 	if ep.started {
 		return errors.New("server is already started")
 	}
 
-	if err := ensurePortAvailable(ep.config.port); err != nil {
-		return err
+	if ep.config.listenAddr != "" {
+		if err := ensurePortAvailable(ep.config.port); err != nil {
+			return err
+		}
 	}
 
 	var logger PostgresLogger
@@ -123,7 +126,7 @@ func (ep *EmbeddedPostgres) Start() error {
 		}
 	}
 
-	if err := os.MkdirAll(ep.config.runtimePath, 0755); err != nil {
+	if err := os.MkdirAll(ep.config.runtimePath, 0o755); err != nil {
 		return fmt.Errorf("unable to create runtime directory %s with error: %w", ep.config.runtimePath, err)
 	}
 
@@ -147,7 +150,11 @@ func (ep *EmbeddedPostgres) Start() error {
 
 	if !reuseData {
 		op := func() error {
-			return ep.createDatabase(ep.config.port, ep.config.username, ep.config.password, ep.config.database)
+			host := ep.config.listenAddr
+			if host == "" {
+				host = ep.config.socketDir
+			}
+			return ep.createDatabase(host, ep.config.port, ep.config.username, ep.config.password, ep.config.database)
 		}
 
 		expBackoff := backoff.NewExponentialBackOff()
@@ -215,7 +222,9 @@ func startPostgres(ep *EmbeddedPostgres) error {
 
 	ep.postgresProcess = exec.Command(postgresBinary,
 		"-D", ep.config.dataPath,
-		"-p", fmt.Sprintf("%d", ep.config.port))
+		"-p", fmt.Sprintf("%d", ep.config.port),
+		"-h", ep.config.listenAddr,
+		"-c", fmt.Sprintf("unix_socket_directories=%s", ep.config.socketDir))
 	ep.postgresProcess.Stdout = ep.logger.stdOut()
 	ep.postgresProcess.Stderr = ep.logger.stdErr()
 
@@ -232,7 +241,7 @@ func startPostgres(ep *EmbeddedPostgres) error {
 		case <-timeout.Done():
 			return postgresStartErr
 		default:
-			if err := ensurePortAvailable(ep.config.port); err != nil {
+			if err := ensureConnectionAvailable(ep); err != nil {
 				// the port is open so assume postgres has started
 				return nil
 			}
@@ -251,7 +260,7 @@ func stopPostgres(ep *EmbeddedPostgres) error {
 		}
 
 		op := func() error {
-			return ensurePortAvailable(ep.config.port)
+			return ensureConnectionAvailable(ep)
 		}
 
 		expBackoff := backoff.NewExponentialBackOff()
@@ -265,6 +274,27 @@ func stopPostgres(ep *EmbeddedPostgres) error {
 	ep.postgresProcess = nil
 
 	return nil
+}
+
+func ensureConnectionAvailable(ep *EmbeddedPostgres) error {
+	if ep.config.listenAddr == "" {
+		return ensureUnixSocketAvailable(fmt.Sprintf("%s/.s.PGSQL.%d", ep.config.socketDir, ep.config.port))
+	}
+	return ensurePortAvailable(ep.config.port)
+}
+
+func ensureUnixSocketAvailable(path string) error {
+	conn, err := net.DialTimeout("unix", path, 100*time.Millisecond)
+	defer func() {
+		if conn != nil {
+			conn.Close()
+		}
+	}()
+	if err != nil {
+		// If we couldn't connect, that's great - probably nothing is listening there
+		return nil
+	}
+	return fmt.Errorf("Something listening on unix socket %v", path)
 }
 
 func ensurePortAvailable(port uint32) error {

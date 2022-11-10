@@ -15,8 +15,10 @@ import (
 	"github.com/lib/pq"
 )
 
-type initDatabase func(binaryExtractLocation, runtimePath, pgDataDir, username, password, locale string, logger PostgresLogger) error
-type createDatabase func(port uint32, username, password, database string) error
+type (
+	initDatabase   func(binaryExtractLocation, runtimePath, pgDataDir, username, password, locale string, logger PostgresLogger) error
+	createDatabase func(host string, port uint32, username, password, database string) error
+)
 
 func defaultInitDatabase(binaryExtractLocation, runtimePath, pgDataDir, username, password, locale string, logger PostgresLogger) error {
 	passwordFile, err := createPasswordFile(runtimePath, password)
@@ -134,19 +136,19 @@ func writeNewConfig(output *os.File, line string) (err error) {
 
 func createPasswordFile(runtimePath, password string) (string, error) {
 	passwordFileLocation := filepath.Join(runtimePath, "pwfile")
-	if err := ioutil.WriteFile(passwordFileLocation, []byte(password), 0600); err != nil {
+	if err := ioutil.WriteFile(passwordFileLocation, []byte(password), 0o600); err != nil {
 		return "", fmt.Errorf("unable to write password file to %s", passwordFileLocation)
 	}
 
 	return passwordFileLocation, nil
 }
 
-func defaultCreateDatabase(port uint32, username, password, database string) error {
+func defaultCreateDatabase(host string, port uint32, username, password, database string) error {
 	if database == "postgres" {
 		return nil
 	}
 
-	conn, err := openDatabaseConnection(port, username, password, "postgres")
+	conn, err := openDatabaseConnection(host, port, username, password, "postgres")
 	if err != nil {
 		return errorCustomDatabase(database, err)
 	}
@@ -169,7 +171,11 @@ func healthCheckDatabaseOrTimeout(config Config) error {
 
 	go func() {
 		for timeout.Err() == nil {
-			if err := healthCheckDatabase(config.port, config.database, config.username, config.password); err != nil {
+			host := config.listenAddr
+			if host == "" {
+				host = config.socketDir
+			}
+			if err := healthCheckDatabase(host, config.port, config.database, config.username, config.password); err != nil {
 				continue
 			}
 			healthCheckSignal <- true
@@ -186,8 +192,8 @@ func healthCheckDatabaseOrTimeout(config Config) error {
 	}
 }
 
-func healthCheckDatabase(port uint32, database, username, password string) error {
-	conn, err := openDatabaseConnection(port, username, password, database)
+func healthCheckDatabase(host string, port uint32, database, username, password string) error {
+	conn, err := openDatabaseConnection(host, port, username, password, database)
 	if err != nil {
 		return err
 	}
@@ -199,8 +205,9 @@ func healthCheckDatabase(port uint32, database, username, password string) error
 	return nil
 }
 
-func openDatabaseConnection(port uint32, username string, password string, database string) (*pq.Connector, error) {
-	conn, err := pq.NewConnector(fmt.Sprintf("host=localhost port=%d user=%s password=%s dbname=%s sslmode=disable",
+func openDatabaseConnection(host string, port uint32, username string, password string, database string) (*pq.Connector, error) {
+	conn, err := pq.NewConnector(fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		host,
 		port,
 		username,
 		password,
