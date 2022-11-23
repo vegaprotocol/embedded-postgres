@@ -97,13 +97,28 @@ func decompressResponse(resp *http.Response, cacheLocator CacheLocator, download
 
 			cacheLocation, _ := cacheLocator()
 
-			if err := os.MkdirAll(filepath.Dir(cacheLocation), 0755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(cacheLocation), 0o755); err != nil {
 				return errorExtractingPostgres(err)
 			}
 
-			if err := ioutil.WriteFile(cacheLocation, archiveBytes, file.FileHeader.Mode()); err != nil {
+			// It is possible that two processes are doing this at the same time, so write to
+			// a temporary file first; then rename it - which is sort-of-mostly atomic.
+			tempFile, err := os.CreateTemp(filepath.Dir(cacheLocation), filepath.Base(cacheLocation))
+			if err != nil {
 				return errorExtractingPostgres(err)
 			}
+			defer os.Remove(tempFile.Name())
+
+			_, err = tempFile.Write(archiveBytes)
+			if err != nil {
+				return errorExtractingPostgres(err)
+			}
+
+			tempFile.Close()
+
+			// It's possible that another process got here first and so cacheLocation might already
+			// exist; so just ignore any error renaming.
+			os.Rename(tempFile.Name(), cacheLocation)
 
 			return nil
 		}
