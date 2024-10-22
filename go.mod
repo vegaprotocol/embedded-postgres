@@ -1,4 +1,4 @@
-module github.com/fergusstrange/embedded-postgres
+module github.com/vegaprotocol/embedded-postgres
 
 go 1.18
 
@@ -14,3 +14,5 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0 // indirect
 )
+
+replace github.com/fergusstrange/embedded-postgres => github.com/vegaprotocol/embedded-postgres v1.29.0-vega
